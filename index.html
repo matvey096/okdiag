@@ -8,166 +8,102 @@
 <style>
   body { font-family: monospace; background:#111; color:#0f0; padding:10px; word-break:break-all; }
   h3 { color:#fff; margin-top:20px; }
-  pre { background:#000; padding:8px; white-space:pre-wrap; border:1px solid #333; min-height:30px; max-height:300px; overflow-y:auto; }
-  button { padding:8px 12px; margin:4px; cursor:pointer; font-family:monospace; }
-  input, textarea { background:#222; color:#0f0; border:1px solid #444; padding:6px; font-family:monospace; width:100%; box-sizing:border-box; margin-bottom:6px; }
-  textarea { height:80px; }
-  label { color:#aaa; font-size:12px; display:block; margin-top:6px; }
-  .section { border:1px solid #333; padding:10px; margin-bottom:10px; }
-  .presets { display:flex; flex-wrap:wrap; }
-  .tag { color:#ff0; }
-  .ok { color:#0f0; }
-  .err { color:#f44; }
+  pre { background:#000; padding:8px; white-space:pre-wrap; border:1px solid #333; }
+  button { padding:10px; margin:5px 0; }
+  #ready { background:#001a00; border:1px solid #0f0; padding:10px; font-size:14px; }
+  #copyBtn { background:#0f0; color:#000; font-weight:bold; border:none; cursor:pointer; }
 </style>
 </head>
 <body>
 
-<div class="section">
-<h3>1. Launch params</h3>
-<pre id="params"></pre>
-</div>
+<h3>0. Готово для копипасты</h3>
+<pre id="ready">жду данные...</pre>
+<button id="copyBtn" onclick="copyReady()">Скопировать SESSION_KEY = "..."</button>
 
-<div class="section">
+<h3>1. Raw launch params (location.search)</h3>
+<pre id="params"></pre>
+
 <h3>2. VKWebAppInit</h3>
 <pre id="init">...</pre>
-</div>
 
-<div class="section">
-<h3>3. GetAuthToken (append_local=true)</h3>
-<button onclick="runToken()">Запросить токен</button>
+<button onclick="runToken()">3. VKWebAppGetAuthToken (append_local=true)</button>
 <pre id="token">не запущено</pre>
-</div>
 
-<div class="section">
-<h3>4. Generic API caller (use_local=true)</h3>
-<label>Method:</label>
-<input id="methodName" type="text" value="users.getCurrentUser" />
-<label>Params (JSON):</label>
-<textarea id="methodParams">{}</textarea>
-
-<div class="presets">
-  <button onclick="preset('users.getCurrentUser', {})">getCurrentUser</button>
-  <button onclick="preset('discussions.getComments', {discussionId:'FILL_TOPIC_ID', count:5, direction:'FORWARD'})">discussions.getComments</button>
-  <button onclick="preset('mediatopic.getByIds', {ids:'FILL_TOPIC_ID'})">mediatopic.getByIds</button>
-  <button onclick="preset('payment.refundUserPayment', {uid:'FILL_UID', transaction_id:'FILL_TXN_ID'})">payment.refundUserPayment</button>
-  <button onclick="preset('payment.getDailyTransactionsFromServer', {uid:'910588483433', date:'2026-08-02'})">payment.getDailyTransactions</button>
-  <button onclick="preset('group.getStatTopicForPartners', {topic_id:'FILL_TOPIC_ID'})">group.getStatTopicForPartners</button>
-  <button onclick="preset('ok.moderation.makeDecisionAndGet', {entityId:'FILL', decision:'ACCEPT'})">moderation.makeDecisionAndGet</button>
-  <button onclick="preset('notifications.sendSimple', {uid:'910588483433', text:'test'})">notifications.sendSimple</button>
-</div>
-
-<button onclick="callMethod()" style="margin-top:8px; padding:12px 20px; background:#003300;">&#9654; ВЫЗВАТЬ</button>
-<pre id="result">не запущено</pre>
-</div>
-
-<div class="section">
-<h3>5. Оплата (тест transaction_id)</h3>
-<button onclick="tryPayVkBridge()" style="background:#330000; padding:12px 20px;">&#128179; VKWebAppShowOrderBox</button>
-<button onclick="tryPayFapi()" style="background:#003300; padding:12px 20px;">&#128179; FAPI showPayment</button>
-<pre id="payResult">не запущено</pre>
-</div>
-
-<div class="section">
-<h3>6. История вызовов</h3>
-<pre id="history" style="max-height:400px;">пусто</pre>
-<button onclick="clearHistory()">Очистить</button>
-</div>
+<button onclick="runApiCall()">4. VKWebAppCallAPIMethod users.getCurrentUser (use_local=true)</button>
+<pre id="apicall">не запущено</pre>
 
 <script>
-var history = [];
-
 document.getElementById('params').textContent = window.location.search + '\n\n' + window.location.hash;
 
-vkBridge.send('VKWebAppInit')
-  .then(r => document.getElementById('init').textContent = JSON.stringify(r))
-  .catch(e => document.getElementById('init').textContent = 'ERROR: ' + JSON.stringify(e));
+var state = { session_key: null, uid: null, fetchedAt: null };
+
+function updateReady() {
+  var out = document.getElementById('ready');
+  if (!state.session_key) {
+    out.textContent = 'жду session_key...';
+    return;
+  }
+  var lines = [
+    'SESSION_KEY = "' + state.session_key + '"',
+    state.uid ? 'UID = "' + state.uid + '"' : 'UID = ?',
+    'fetched_at = ' + state.fetchedAt
+  ];
+  out.textContent = lines.join('\n');
+}
+
+function copyReady() {
+  var text = document.getElementById('ready').textContent;
+  navigator.clipboard.writeText(text).catch(function(){});
+}
 
 function runToken() {
   var out = document.getElementById('token');
   out.textContent = 'запрос...';
   vkBridge.send('VKWebAppGetAuthToken', { app_id: 54684480, scope: '', append_local: true })
-    .then(r => out.textContent = JSON.stringify(r, null, 2))
-    .catch(e => out.textContent = 'ERROR: ' + JSON.stringify(e, null, 2));
-}
-
-function preset(method, params) {
-  document.getElementById('methodName').value = method;
-  document.getElementById('methodParams').value = JSON.stringify(params, null, 2);
-}
-
-function callMethod() {
-  var out = document.getElementById('result');
-  out.textContent = 'запрос...';
-  var method = document.getElementById('methodName').value.trim();
-  var params;
-  try { params = JSON.parse(document.getElementById('methodParams').value); }
-  catch(e) { out.textContent = 'JSON parse error: ' + e.message; return; }
-
-  var ts = new Date().toISOString().slice(11,19);
-
-  vkBridge.send('VKWebAppCallAPIMethod', { method: method, params: params, use_local: true })
-    .then(r => {
-      var txt = JSON.stringify(r, null, 2);
-      out.textContent = txt;
-      addHistory(ts, method, params, txt, false);
+    .then(function(r) {
+      out.textContent = JSON.stringify(r, null, 2);
+      if (r && r.access_token) {
+        state.session_key = r.access_token;
+        state.fetchedAt = new Date().toISOString();
+        updateReady();
+      }
+      runApiCall();
     })
-    .catch(e => {
-      var txt = 'ERROR: ' + JSON.stringify(e, null, 2);
-      out.textContent = txt;
-      addHistory(ts, method, params, txt, true);
-    });
+    .catch(function(e) { out.textContent = 'ERROR: ' + JSON.stringify(e, null, 2); });
 }
 
-function addHistory(ts, method, params, result, isErr) {
-  history.unshift({ ts, method, params, result, isErr });
-  renderHistory();
-}
-
-function renderHistory() {
-  if (!history.length) { document.getElementById('history').textContent = 'пусто'; return; }
-  document.getElementById('history').textContent = history.map(h =>
-    '[' + h.ts + '] ' + h.method + '\n' +
-    'params: ' + JSON.stringify(h.params) + '\n' +
-    h.result + '\n' + '─'.repeat(60)
-  ).join('\n');
-}
-
-function clearHistory() {
-  history = [];
-  renderHistory();
-}
-
-function tryPayVkBridge() {
-  var out = document.getElementById('payResult');
-  out.textContent = 'запрос VKWebAppShowOrderBox...';
-  vkBridge.send('VKWebAppShowOrderBox', {
-    type: 'item',
-    item: 'test_item_1'
+function runApiCall() {
+  var out = document.getElementById('apicall');
+  out.textContent = 'запрос...';
+  vkBridge.send('VKWebAppCallAPIMethod', {
+    method: 'users.getCurrentUser',
+    params: {},
+    use_local: true
   })
-  .then(r => out.textContent = 'OK: ' + JSON.stringify(r, null, 2))
-  .catch(e => out.textContent = 'ERROR: ' + JSON.stringify(e, null, 2));
+    .then(function(r) {
+      out.textContent = JSON.stringify(r, null, 2);
+      try {
+        var parsed = typeof r.response === 'string' ? JSON.parse(r.response) : r.response;
+        if (parsed && parsed.uid) {
+          state.uid = parsed.uid;
+        } else if (Array.isArray(parsed) && parsed[0] && parsed[0].uid) {
+          state.uid = parsed[0].uid;
+        }
+      } catch (e) {}
+      updateReady();
+    })
+    .catch(function(e) { out.textContent = 'ERROR: ' + JSON.stringify(e, null, 2); });
 }
 
-function tryPayFapi() {
-  var out = document.getElementById('payResult');
-  if (typeof FAPI === 'undefined') {
-    out.textContent = 'FAPI не загружен (работает только внутри ok.ru canvas)';
-    return;
-  }
-  out.textContent = 'запрос FAPI.invokeUIMethod showPayment...';
-  try {
-    FAPI.invokeUIMethod('showPayment', {
-      name: 'Test',
-      price: 1,
-      description: 'test payment',
-      currency: 'IRON_OK'
-    }, function(status, data) {
-      out.textContent = 'status: ' + status + '\n' + JSON.stringify(data, null, 2);
-    });
-  } catch(e) {
-    out.textContent = 'FAPI error: ' + e.message;
-  }
-}
+vkBridge.send('VKWebAppInit')
+  .then(function(r) {
+    document.getElementById('init').textContent = JSON.stringify(r);
+    runToken();
+  })
+  .catch(function(e) {
+    document.getElementById('init').textContent = 'ERROR: ' + JSON.stringify(e);
+  });
 </script>
 </body>
 </html>
+</content>
