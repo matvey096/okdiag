@@ -61,7 +61,14 @@
 </div>
 
 <div class="section">
-<h3>5. История вызовов</h3>
+<h3>5. Оплата (тест transaction_id)</h3>
+<button onclick="tryPayVkBridge()" style="background:#330000; padding:12px 20px;">&#128179; VKWebAppShowOrderBox</button>
+<button onclick="tryPayFapi()" style="background:#003300; padding:12px 20px;">&#128179; FAPI showPayment</button>
+<pre id="payResult">не запущено</pre>
+</div>
+
+<div class="section">
+<h3>6. История вызовов</h3>
 <pre id="history" style="max-height:400px;">пусто</pre>
 <button onclick="clearHistory()">Очистить</button>
 </div>
@@ -128,6 +135,38 @@ function renderHistory() {
 function clearHistory() {
   history = [];
   renderHistory();
+}
+
+function tryPayVkBridge() {
+  var out = document.getElementById('payResult');
+  out.textContent = 'запрос VKWebAppShowOrderBox...';
+  vkBridge.send('VKWebAppShowOrderBox', {
+    type: 'item',
+    item: 'test_item_1'
+  })
+  .then(r => out.textContent = 'OK: ' + JSON.stringify(r, null, 2))
+  .catch(e => out.textContent = 'ERROR: ' + JSON.stringify(e, null, 2));
+}
+
+function tryPayFapi() {
+  var out = document.getElementById('payResult');
+  if (typeof FAPI === 'undefined') {
+    out.textContent = 'FAPI не загружен (работает только внутри ok.ru canvas)';
+    return;
+  }
+  out.textContent = 'запрос FAPI.invokeUIMethod showPayment...';
+  try {
+    FAPI.invokeUIMethod('showPayment', {
+      name: 'Test',
+      price: 1,
+      description: 'test payment',
+      currency: 'IRON_OK'
+    }, function(status, data) {
+      out.textContent = 'status: ' + status + '\n' + JSON.stringify(data, null, 2);
+    });
+  } catch(e) {
+    out.textContent = 'FAPI error: ' + e.message;
+  }
 }
 </script>
 </body>
