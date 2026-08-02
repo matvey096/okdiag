@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>diag</title>
+<script src="https://unpkg.com/@vkontakte/vk-bridge@2/dist/browser.min.js"></script>
+<style>
+  body { font-family: monospace; background:#111; color:#0f0; padding:10px; word-break:break-all; }
+  h3 { color:#fff; margin-top:20px; }
+  pre { background:#000; padding:8px; white-space:pre-wrap; border:1px solid #333; }
+  button { padding:10px; margin:5px 0; }
+</style>
+</head>
+<body>
+<h3>1. Raw launch params (location.search)</h3>
+<pre id="params"></pre>
+
+<h3>2. VKWebAppInit</h3>
+<pre id="init">...</pre>
+
+<button onclick="runToken()">3. VKWebAppGetAuthToken (append_local=true)</button>
+<pre id="token">не запущено</pre>
+
+<button onclick="runApiCall()">4. VKWebAppCallAPIMethod users.getCurrentUser (use_local=true)</button>
+<pre id="apicall">не запущено</pre>
+
+<script>
+document.getElementById('params').textContent = window.location.search + '\n\n' + window.location.hash;
+
+vkBridge.send('VKWebAppInit')
+  .then(r => document.getElementById('init').textContent = JSON.stringify(r))
+  .catch(e => document.getElementById('init').textContent = 'ERROR: ' + JSON.stringify(e));
+
+var lastToken = null;
+
+function runToken() {
+  var out = document.getElementById('token');
+  out.textContent = 'запрос...';
+  vkBridge.send('VKWebAppGetAuthToken', { app_id: 54684480, scope: '', append_local: true })
+    .then(r => {
+      lastToken = r;
+      out.textContent = JSON.stringify(r, null, 2);
+    })
+    .catch(e => out.textContent = 'ERROR: ' + JSON.stringify(e, null, 2));
+}
+
+function runApiCall() {
+  var out = document.getElementById('apicall');
+  out.textContent = 'запрос...';
+  vkBridge.send('VKWebAppCallAPIMethod', {
+    method: 'users.getCurrentUser',
+    params: {},
+    use_local: true
+  })
+    .then(r => out.textContent = JSON.stringify(r, null, 2))
+    .catch(e => out.textContent = 'ERROR: ' + JSON.stringify(e, null, 2));
+}
+</script>
+</body>
+</html>
